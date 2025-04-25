@@ -2,22 +2,21 @@ from flask import Flask, render_template, request, redirect, url_for
 import boto3
 from werkzeug.utils import secure_filename
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env file
 
 app = Flask(__name__)
-
-# Manually set your AWS credentials and region here
-aws_access_key_id = 'AKIA5WLTTN3S3K7TUKPH'
-aws_secret_access_key = 'Kx9ZxOSFHQbOhfw3cbyjsMpTpYfpylFxtE+T5tvp'
-region_name = 'us-east-1'  
-bucket_name = 'file-share-bucketname'
 
 # AWS S3 Client
 s3 = boto3.client(
     's3',
-    aws_access_key_id=aws_access_key_id,
-    aws_secret_access_key=aws_secret_access_key,
-    region_name=region_name
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('S3_REGION')
 )
+
+BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 @app.route('/')
 def home():
@@ -37,7 +36,7 @@ def upload():
     # Upload to S3
     s3.upload_fileobj(
         file,
-        bucket_name,
+        BUCKET_NAME,
         filename,
     )
         
@@ -47,7 +46,7 @@ def upload():
 @app.route('/files')
 def file_list():
     # Get all objects from the S3 bucket
-    response = s3.list_objects_v2(Bucket=bucket_name)
+    response = s3.list_objects_v2(Bucket=BUCKET_NAME)
     
     files = []
     if 'Contents' in response:
@@ -57,7 +56,7 @@ def file_list():
                 'name': item['Key'],
                 'size': format_size(item['Size']),
                 'last_modified': item['LastModified'],
-                'url': f"https://{bucket_name}.s3.amazonaws.com/{item['Key']}",
+                'url': f"https://{BUCKET_NAME}.s3.amazonaws.com/{item['Key']}",
             }
             files.append(file_info)
     files.sort(key=lambda x: x['last_modified'], reverse=True)
