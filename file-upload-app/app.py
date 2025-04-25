@@ -11,7 +11,7 @@ s3 = boto3.client(
     region_name='us-east-1'  # Set your AWS region here
 )
 
-BUCKET_NAME = 'file-share-bucketname '  # Set your S3 bucket name directly here
+BUCKET_NAME = 'file-share-bucketname'  # Set your S3 bucket name directly here
 
 @app.route('/')
 def home():
