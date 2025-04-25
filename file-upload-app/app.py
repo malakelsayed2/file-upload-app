@@ -2,21 +2,16 @@ from flask import Flask, render_template, request, redirect, url_for
 import boto3
 from werkzeug.utils import secure_filename
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # Load .env file
 
 app = Flask(__name__)
 
-# AWS S3 Client
+# AWS S3 Client (No need for .env file, setting directly)
 s3 = boto3.client(
     's3',
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('S3_REGION')
+    region_name='us-east-1'  # Set your AWS region here
 )
 
-BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+BUCKET_NAME = 'file-share-bucketname '  # Set your S3 bucket name directly here
 
 @app.route('/')
 def home():
@@ -33,7 +28,7 @@ def upload():
         
     filename = secure_filename(file.filename)
         
-    # Upload to S3
+    # Upload the file to S3
     s3.upload_fileobj(
         file,
         BUCKET_NAME,
