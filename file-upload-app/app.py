@@ -1,74 +1,85 @@
+import logging
+import traceback
+import os
 from flask import Flask, render_template, request, redirect, url_for
 import boto3
 from werkzeug.utils import secure_filename
-import os
 from dotenv import load_dotenv
+from botocore.exceptions import ClientError
 
-load_dotenv()  # Load .env file
+load_dotenv()
 
 app = Flask(__name__)
+
+# Configure Logging
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 # AWS S3 Client
 s3 = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
     aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('S3_REGION')
+    region_name=os.getenv('AWS_REGION')
 )
 
 BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
+
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files:
-        return redirect(url_for('home'))
-        
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('home'))
-        
-    filename = secure_filename(file.filename)
-        
-    # Upload to S3
-    s3.upload_fileobj(
-        file,
-        BUCKET_NAME,
-        filename,
-    )
-        
-    # Redirect to the file list page
-    return redirect(url_for('file_list'))
+    logging.debug("Starting upload function")
+    try:
+        if 'file' not in request.files:
+            logging.debug("No file part in request")
+            return redirect(url_for('home'))
+
+        file = request.files['file']
+        logging.debug(f"File received: {file.filename}")
+
+        if file.filename == '':
+            logging.debug("No file selected for upload")
+            return redirect(url_for('home'))
+
+        filename = secure_filename(file.filename)
+        logging.debug(f"Secure filename: {filename}")
+
+        logging.debug(f"Bucket name: {BUCKET_NAME}")
+
+        try:
+            s3.upload_fileobj(file, BUCKET_NAME, filename)
+            logging.info(f"File '{filename}' uploaded successfully to S3")
+            return redirect(url_for('file_list'))
+        except ClientError as e:
+            logging.error(f"S3 ClientError: {e}")
+            return "Error uploading to S3", 500
+
+    except Exception as e:
+        logging.error(f"An error occurred during upload: {e}")
+        logging.error(traceback.format_exc())  # Log the full traceback
+        return f"An error occurred: {str(e)}", 500
+
 
 @app.route('/files')
 def file_list():
-    # Get all objects from the S3 bucket
     response = s3.list_objects_v2(Bucket=BUCKET_NAME)
-    
     files = []
     if 'Contents' in response:
         for item in response['Contents']:
-            # Create file info dictionary
             file_info = {
                 'name': item['Key'],
-                'size': format_size(item['Size']),
-                'last_modified': item['LastModified'],
+                'size': item['Size'],
                 'url': f"https://{BUCKET_NAME}.s3.amazonaws.com/{item['Key']}",
+                'last_modified': item['LastModified']
             }
             files.append(file_info)
-    files.sort(key=lambda x: x['last_modified'], reverse=True)
     return render_template('filelist.html', files=files)
 
-def format_size(size_bytes):
-    # Format file size for display
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.2f} PB"
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)  # Enable debug mode for more info
