@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 load_dotenv()
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit (adjust as needed)
 
 # Configure Logging
 logging.basicConfig(level=logging.DEBUG,
@@ -45,6 +46,10 @@ def upload():
         if file.filename == '':
             logging.debug("No file selected for upload")
             return redirect(url_for('home'))
+
+        if request.content_length > app.config['MAX_CONTENT_LENGTH']:
+            logging.warning("File size exceeded limit")
+            return "File size exceeded limit", 413  # 413 Payload Too Large
 
         filename = secure_filename(file.filename)
         logging.debug(f"Secure filename: {filename}")
